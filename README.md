@@ -10,18 +10,22 @@ Written in Python. No paid APIs needed — runs entirely on testnet with fake mo
 ## Project Structure
 
 ```
-trading_bot/
-├── bot/
+CRYPTO_BOT/
+├── cli.py                  # Main CLI interface
+├── config.py               # API credentials (gitignored)
+├── config.example.py       # Example config template
+├── requirements.txt        # Python dependencies
+├── README.md              # Documentation
+├── .gitignore             # Git ignore rules
+├── bot/                   # Bot module
 │   ├── __init__.py
-│   ├── client.py          # Binance REST API wrapper (auth, signing, requests)
-│   ├── orders.py          # Order placement logic (market, limit, stop-limit)
-│   ├── validators.py      # Input validation before anything hits the network
-│   └── logging_config.py  # File + console logging setup
-├── cli.py                 # Entry point — CLI via argparse
-├── logs/                  # Log files land here (auto-created)
-├── .env.example           # Copy this to .env and fill in your keys
-├── requirements.txt
-└── README.md
+│   ├── client.py          # Binance API client
+│   ├── orders.py          # Order placement functions
+│   ├── validators.py      # Input validation
+│   ├── symbol_info.py     # Symbol rules and limits
+│   └── logging_config.py  # Logging configuration
+└── logs/                  # Log files directory
+    └── bot.log            # Application logs
 ```
 
 ---
@@ -31,7 +35,7 @@ trading_bot/
 **1. Clone and install dependencies**
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/siddhik-reddy/CRYPTO_BOT.git
 cd trading_bot
 pip install -r requirements.txt
 ```
@@ -44,50 +48,15 @@ Under your account, go to **API Management** and generate a key pair.
 
 **3. Set your credentials**
 
-Credentials are stored base64-encoded directly in `cli.py`. Run this once in a Python shell to encode yours:
-
-```python
-import base64
-print(base64.b64encode(b"your_api_key_here").decode())
-print(base64.b64encode(b"your_api_secret_here").decode())
-```
-
-Then paste the output into the top of `cli.py`:
-
-```python
-_ENC_API_KEY    = b"<your encoded key>"
-_ENC_API_SECRET = b"<your encoded secret>"
-```
-
----
+Credentials are stored base64-encoded directly in `cli.py`. Run this once in a Config.py file:
 
 ## How to Run
 
-### Market Order (BUY)
 
 ```bash
-python cli.py --symbol BTCUSDT --side BUY --type MARKET --quantity 0.01
+python cli.py 
 ```
 
-### Market Order (SELL)
-
-```bash
-python cli.py --symbol BTCUSDT --side SELL --type MARKET --quantity 0.01
-```
-
-### Limit Order
-
-```bash
-python cli.py --symbol ETHUSDT --side BUY --type LIMIT --quantity 0.1 --price 3200
-```
-
-### Stop-Limit Order (bonus)
-
-```bash
-python cli.py --symbol BTCUSDT --side BUY --type STOP_LIMIT --quantity 0.01 --price 62000 --stop-price 61500
-```
-
----
 
 ## What the Output Looks Like
 
@@ -117,15 +86,6 @@ python cli.py --symbol BTCUSDT --side BUY --type STOP_LIMIT --quantity 0.01 --pr
   ✓ Order placed successfully.
 ```
 
----
-
-## Logging
-
-Logs are written to `logs/trading_bot_YYYYMMDD.log`. Every request, response, and error gets recorded there. The terminal stays quiet unless something actually goes wrong.
-
-Sample log files are included in `logs/` for reference.
-
----
 
 ## Assumptions
 
@@ -134,3 +94,14 @@ Sample log files are included in `logs/` for reference.
 - LIMIT orders use `timeInForce=GTC` (Good Till Cancelled) by default.
 - STOP_LIMIT uses order type `STOP` on the futures API, which maps to a stop-limit execution.
 - Credentials are loaded from `.env` using `python-dotenv`. Never commit your `.env` file.
+
+```
+
+ Contact
+Siddhik Reddy
+
+📧 Email: siddhikreddy440@gmail.com
+
+📱 Phone: +91 8897350151
+
+```

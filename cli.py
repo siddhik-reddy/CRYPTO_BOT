@@ -659,4 +659,261 @@ def get_validated_quantity(client, symbol, order_type, available_balance, levera
                 symbol, current_price, available_balance * 0.95, leverage
             )
             quantity = min(max_by_margin, max_qty if max_qty < 999999 else max_by_margin)
-            print(f" 
+            print(f"  {c_green(f'Using max quantity: {quantity}')}")
+        else:
+            try:
+                quantity = float(quantity)
+            except ValueError:
+                print(f"  {c_red('[error]')} Please enter a valid number or 'max'")
+                continue
+        
+        try:
+            validated_qty = symbol_info.validate_quantity(symbol, quantity, order_type)
+            if validated_qty != quantity:
+                print(f"  {c_yellow(f'Quantity adjusted to: {validated_qty}')}")
+            
+            # Check margin
+            if current_price > 0:
+                required_margin = symbol_info.calculate_required_margin(
+                    symbol, validated_qty, current_price, leverage
+                )
+                if required_margin > available_balance:
+                    print(f"  {c_red('[error]')} Insufficient margin. Required: {required_margin:.2f} USDT, Available: {available_balance:.2f} USDT")
+                    max_affordable = symbol_info.get_max_quantity_by_margin(
+                        symbol, current_price, available_balance * 0.95, leverage
+                    )
+                    print(f"  {c_yellow(f'Max you can afford: {max_affordable}')}")
+                    continue
+            
+            return validated_qty
+            
+        except ValueError as e:
+            print(f"  {c_red('[error]')} {e}")
+            print(f"  {c_yellow('Please enter a valid quantity.')}")
+            continue
+
+
+# ─── Order flow ───────────────────────────────────────────────────────────────
+
+def place_order_flow():
+    print()
+    divider()
+    print(f"   {c_bold('Place Order')}")
+    divider()
+    
+    # Initialize client early for validation
+    client = BinanceClient(API_KEY, API_SECRET)
+
+    # Get account balance first
+    with Spinner("Fetching account balance..."):
+        time.sleep(0.3)
+        try:
+            available_balance = client.get_balance_for_asset("USDT")
+            step(f"Available balance: {c_green(f'{available_balance:.2f} USDT')}")
+        except Exception as e:
+            step("Could not fetch balance", ok=False)
+            print(f"  {c_yellow('[warning]')} {e}")
+            available_balance = 0
+
+    if available_balance <= 0:
+        print(f"\n  {c_red('[error]')} Insufficient balance. Please add testnet funds.")
+        print(f"  {c_yellow('Visit: https://testnet.binancefuture.com/ to get testnet USDT')}")
+        input(f"\n  {c_dim('Press Enter to go back...')}")
+        main_menu()
+        return
+
+    # Get validated symbol
+    symbol = get_validated_symbol(client)
+    if symbol is None:
+        main_menu()
+        return
+
+    # side
+    side = pick("Select Side", ["BUY", "SELL"])
+    side_color = c_green(side) if side == "BUY" else c_red(side)
+    print(f"  Selected side: {side_color}")
+
+    # order type
+    order_type = pick("Select Order Type", [
+        "MARKET  — fills immediately at market price",
+        "LIMIT   — fills when price reaches your target",
+        "STOP_LIMIT — triggers a limit order at stop price",
+    ])
+    order_type = order_type.split()[0]
+
+    # Get leverage (optional, default 1x for safety)
+    print(f"\n  {c_bold('Available Balance:')} {c_green(f'{available_balance:.2f} USDT')}")
+    print(f"  {c_dim('Leverage: 1x (default for testnet)')}")
+    leverage = 1
+    
+    # Get validated quantity with margin consideration
+    symbol_info = SymbolInfo(client)
+    current_price = 0
+    
+    # Get current price for market orders
+    if order_type == "MARKET":
+        with Spinner("Fetching current price..."):
+            time.sleep(0.2)
+            current_price = client.get_current_price(symbol)
+            if current_price > 0:
+                step(f"Current {c_bold(symbol)} price: {c_cyan(f'{current_price}')}")
+            else:
+                step("Could not fetch current price", ok=False)
+    
+    # Get validated quantity
+    quantity = get_validated_quantity(
+        client, symbol, order_type, available_balance, leverage, current_price
+    )
+    if quantity is None:
+        place_order_flow()
+        return
+
+    # price fields
+    price = None
+    stop_price = None
+
+    if order_type in ("LIMIT", "STOP_LIMIT"):
+        while True:
+            price = get_validated_price(client, symbol, "Limit price")
+            if price is None:
+                place_order_flow()
+                return
+            
+            # Check margin requirement
+            required_margin = symbol_info.calculate_required_margin(
+                symbol, quantity, price, leverage
+            )
+            if required_margin > available_balance:
+                print(f"  {c_red('[error]')} Insufficient margin. Required: {required_margin:.2f} USDT, Available: {available_balance:.2f} USDT")
+                print(f"  {c_yellow('Try lower quantity or price, or get more testnet USDT')}")
+                continue
+            break
+
+    if order_type == "STOP_LIMIT":
+        while True:
+            stop_price = get_validated_price(client, symbol, "Stop trigger price")
+            if stop_price is None:
+                place_order_flow()
+                return
+            
+            # Validate stop price logic
+            if side == "BUY" and stop_price <= price:
+                print(f"\n  {c_red('[error]')} For BUY STOP_LIMIT, stop price ({stop_price}) must be above limit price ({price})")
+                continue
+            elif side == "SELL" and stop_price >= price:
+                print(f"\n  {c_red('[error]')} For SELL STOP_LIMIT, stop price ({stop_price}) must be below limit price ({price})")
+                continue
+            break
+
+    # Validate minimum notional
+    if price:
+        notional = quantity * price
+        min_notional = symbol_info.get_min_notional(symbol)
+        if notional < min_notional:
+            print(f"\n  {c_red('[error]')} Order total ({notional:.2f} USDT) is below minimum notional ({min_notional} USDT)")
+            print(f"  {c_yellow('Please increase quantity or price.')}")
+            input(f"  {c_dim('Press Enter to continue...')}")
+            place_order_flow()
+            return
+
+    # Show final order parameters
+    print(f"\n  {c_bold('Final order parameters:')}")
+    print(f"  Symbol: {c_bold(symbol)}")
+    print(f"  Side: {side_color}")
+    print(f"  Type: {c_cyan(order_type)}")
+    print(f"  Quantity: {c_bold(quantity)}")
+    if price:
+        total = quantity * price
+        margin = symbol_info.calculate_required_margin(symbol, quantity, price, leverage)
+        print(f"  Price: {c_cyan(price)}")
+        print(f"  Total: {c_cyan(f'{total:.2f} USDT')}")
+        print(f"  Required Margin: {c_yellow(f'{margin:.2f} USDT')}")
+        print(f"  Available Balance: {c_green(f'{available_balance:.2f} USDT')}")
+    if stop_price:
+        print(f"  Stop Price: {c_yellow(stop_price)}")
+
+    # summary
+    print()
+    divider()
+    print(f"   {c_bold('Order Summary')}")
+    divider()
+    print(f"   Symbol      : {c_bold(symbol)}")
+    print(f"   Side        : {side_color}")
+    print(f"   Type        : {c_cyan(order_type)}")
+    print(f"   Quantity    : {c_bold(quantity)}")
+    if price:
+        print(f"   Price       : {c_cyan(price)}")
+        print(f"   Total       : {c_cyan(f'{quantity * price:.2f} USDT')}")
+        print(f"   Margin      : {c_yellow(f'{symbol_info.calculate_required_margin(symbol, quantity, price, leverage):.2f} USDT')}")
+    if stop_price:
+        print(f"   Stop Price  : {c_yellow(stop_price)}")
+    divider()
+
+    try:
+        confirm = input(f"\n  {c_bold('Confirm and place order?')} [y/n]: ").strip().lower()
+    except KeyboardInterrupt:
+        print(f"\n  {c_yellow('Cancelled.')}\n")
+        main_menu()
+        return
+
+    if confirm != "y":
+        print(f"\n  {c_yellow('Order cancelled.')}\n")
+        input(f"  {c_dim('Press Enter to go back...')}")
+        main_menu()
+        return
+
+    print()
+
+    # place the order
+    try:
+        with Spinner("Sending order to Binance Testnet..."):
+            if order_type == "MARKET":
+                response = place_market_order(client, symbol, side, quantity)
+            elif order_type == "LIMIT":
+                response = place_limit_order(client, symbol, side, quantity, price)
+            elif order_type == "STOP_LIMIT":
+                response = place_stop_limit_order(client, symbol, side, quantity, price, stop_price)
+
+        step("Order placed successfully")
+        print(format_response(response))
+        logger.info(f"Order placed: orderId={response.get('orderId')} symbol={symbol} side={side} type={order_type}")
+
+    except RuntimeError as e:
+        step("Order failed", ok=False)
+        print(f"\n  {c_red('[API error]')} {e}\n")
+        logger.error(f"Order failed: {e}")
+        
+        # Specific help for margin errors
+        if "margin" in str(e).lower() or "insufficient" in str(e).lower():
+            print(f"  {c_yellow('💡 Tip: You can get free testnet USDT at:')}")
+            print(f"  {c_yellow('   https://testnet.binancefuture.com/')}")
+            print(f"  {c_yellow('   Look for the Faucet or Get Testnet Funds option')}")
+
+    try:
+        again = input(f"  {c_bold('Place another order?')} [y/n]: ").strip().lower()
+        if again == "y":
+            place_order_flow()
+        else:
+            main_menu()
+    except KeyboardInterrupt:
+        print(f"\n  {c_green('Goodbye.')}\n")
+        sys.exit(0)
+
+
+# ─── Entry ────────────────────────────────────────────────────────────────────
+
+def main():
+    # verify credentials on startup
+    with Spinner("Loading credentials..."):
+        time.sleep(0.3)
+        if not API_KEY or not API_SECRET or "your_" in API_KEY:
+            sys.stdout.write("\r" + " " * 50 + "\r")
+            print(f"\n  {c_red('[error]')} Paste your real API keys into config.py first.\n")
+            sys.exit(1)
+    step("Credentials loaded")
+
+    main_menu()
+
+
+if __name__ == "__main__":
+    main()

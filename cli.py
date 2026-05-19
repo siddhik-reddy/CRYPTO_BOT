@@ -72,7 +72,8 @@ def c_dim(text): return colorize(text, Colors.DIM)
 try:
     from config import API_KEY, API_SECRET
 except ImportError:
-    print(f"\n  {c_red('[error]')} config.py not found.")
+    error_msg = "[error] config.py not found."
+    print(f"\n  {c_red(error_msg)}")
     print("  Create config.py in the project root with:")
     print('    API_KEY    = "your_key"')
     print('    API_SECRET = "your_secret"')
@@ -202,7 +203,8 @@ def pick(prompt: str, options: list) -> str:
             idx = int(raw) - 1
             if 0 <= idx < len(options):
                 return options[idx]
-            print(f"  {c_yellow('Enter a number between 1 and ' + str(len(options)) + '.')}")
+            msg = f"Enter a number between 1 and {len(options)}."
+            print(f"  {c_yellow(msg)}")
         except (ValueError, KeyboardInterrupt):
             print(f"\n  {c_yellow('Cancelled.')}\n")
             sys.exit(0)
@@ -214,13 +216,15 @@ def ask(prompt: str, cast=str, allow_back: bool = True):
         try:
             raw = input(f"  {c_cyan(prompt)}: ").strip()
             if not raw:
-                print(f"  {c_yellow(\"Can't be empty, try again.\")}")
+                msg = "Can't be empty, try again."
+                print(f"  {c_yellow(msg)}")
                 continue
             if allow_back and raw.lower() == 'back':
                 return None
             return cast(raw)
         except ValueError:
-            print(f"  {c_yellow(f'Invalid {cast.__name__} value, try again.')}")
+            msg = f"Invalid {cast.__name__} value, try again."
+            print(f"  {c_yellow(msg)}")
         except KeyboardInterrupt:
             print(f"\n  {c_yellow('Cancelled.')}\n")
             sys.exit(0)
@@ -286,10 +290,10 @@ def test_api_status():
                     non_zero_assets.append(f"{asset['asset']}: {balance_val}")
             
             if non_zero_assets:
-                step(f"API authentication {c_green('(✓)')} — {total_assets} assets with balance", ok=True)
+                step(f"API authentication (OK) - {total_assets} assets with balance", ok=True)
                 logger.info(f"Account balance retrieved: {total_assets} non-zero assets")
             else:
-                step(f"API authentication {c_green('(✓)')} — No balance found (expected on testnet)", ok=True)
+                step("API authentication (OK) - No balance found (expected on testnet)", ok=True)
                 logger.info("Account balance retrieved: no non-zero balances")
                 
         except Exception as e:
@@ -304,11 +308,11 @@ def test_api_status():
             open_positions = [p for p in positions if float(p.get("positionAmt", 0)) != 0]
             
             if open_positions:
-                step(f"Position info {c_green('(✓)')} — {len(open_positions)} open position(s)", ok=True)
+                step(f"Position info (OK) - {len(open_positions)} open position(s)", ok=True)
                 for pos in open_positions:
                     print(f"         {pos['symbol']}: {pos['positionAmt']} ({pos['unRealizedProfit']} USDT)")
             else:
-                step(f"Position info {c_green('(✓)')} — No open positions", ok=True)
+                step("Position info (OK) - No open positions", ok=True)
             logger.info(f"Position info retrieved: {len(open_positions)} open positions")
                 
         except Exception as e:
@@ -370,9 +374,11 @@ def show_order_history():
             if 1 <= limit <= 100:
                 break
             else:
-                print(f"  {c_yellow('Please enter a number between 1 and 100.')}")
+                msg = "Please enter a number between 1 and 100."
+                print(f"  {c_yellow(msg)}")
         except ValueError:
-            print(f"  {c_yellow('Please enter a valid number.')}")
+            msg = "Please enter a valid number."
+            print(f"  {c_yellow(msg)}")
     
     with Spinner(f"Fetching order history for {symbol}..."):
         time.sleep(0.3)
@@ -407,7 +413,12 @@ def show_order_history():
                     
                     # Color code side and status
                     side_colored = c_green(side) if side == "BUY" else c_red(side)
-                    status_colored = c_green(status) if status == "FILLED" else c_yellow(status) if status == "NEW" else c_red(status)
+                    if status == "FILLED":
+                        status_colored = c_green(status)
+                    elif status == "NEW":
+                        status_colored = c_yellow(status)
+                    else:
+                        status_colored = c_red(status)
                     
                     price_display = f"{float(price):.2f}" if float(price) > 0 else "MARKET"
                     
@@ -484,7 +495,8 @@ def show_account_info():
                         total_usdt = balance_val
             
             if not assets_with_balance:
-                print(f"  {c_yellow('No assets with balance')}")
+                msg = "No assets with balance"
+                print(f"  {c_yellow(msg)}")
             else:
                 print(f"  {c_dim('─' * 50)}")
                 print(f"  {c_bold('Total USDT:')} {c_green(f'{total_usdt:.2f}')}")
@@ -602,7 +614,8 @@ def get_validated_symbol(client):
             return symbol
         except ValueError as e:
             print(f"\n  {c_red('[error]')} {e}")
-            print(f"  {c_yellow('Please select a valid symbol.')}")
+            msg = "Please select a valid symbol."
+            print(f"  {c_yellow(msg)}")
             continue
 
 
@@ -627,7 +640,8 @@ def get_validated_price(client, symbol, price_type="Limit price"):
             return validated_price
         except ValueError as e:
             print(f"  {c_red('[error]')} {e}")
-            print(f"  {c_yellow('Please enter a valid price.')}")
+            msg = "Please enter a valid price."
+            print(f"  {c_yellow(msg)}")
             continue
 
 
@@ -664,7 +678,8 @@ def get_validated_quantity(client, symbol, order_type, available_balance, levera
             try:
                 quantity = float(quantity)
             except ValueError:
-                print(f"  {c_red('[error]')} Please enter a valid number or 'max'")
+                msg = "Please enter a valid number or 'max'"
+                print(f"  {c_red('[error]')} {msg}")
                 continue
         
         try:
@@ -689,7 +704,8 @@ def get_validated_quantity(client, symbol, order_type, available_balance, levera
             
         except ValueError as e:
             print(f"  {c_red('[error]')} {e}")
-            print(f"  {c_yellow('Please enter a valid quantity.')}")
+            msg = "Please enter a valid quantity."
+            print(f"  {c_yellow(msg)}")
             continue
 
 
@@ -785,7 +801,8 @@ def place_order_flow():
             )
             if required_margin > available_balance:
                 print(f"  {c_red('[error]')} Insufficient margin. Required: {required_margin:.2f} USDT, Available: {available_balance:.2f} USDT")
-                print(f"  {c_yellow('Try lower quantity or price, or get more testnet USDT')}")
+                msg = "Try lower quantity or price, or get more testnet USDT"
+                print(f"  {c_yellow(msg)}")
                 continue
             break
 
@@ -885,7 +902,7 @@ def place_order_flow():
         
         # Specific help for margin errors
         if "margin" in str(e).lower() or "insufficient" in str(e).lower():
-            print(f"  {c_yellow('💡 Tip: You can get free testnet USDT at:')}")
+            print(f"  {c_yellow('Tip: You can get free testnet USDT at:')}")
             print(f"  {c_yellow('   https://testnet.binancefuture.com/')}")
             print(f"  {c_yellow('   Look for the Faucet or Get Testnet Funds option')}")
 
@@ -908,7 +925,8 @@ def main():
         time.sleep(0.3)
         if not API_KEY or not API_SECRET or "your_" in API_KEY:
             sys.stdout.write("\r" + " " * 50 + "\r")
-            print(f"\n  {c_red('[error]')} Paste your real API keys into config.py first.\n")
+            error_msg = "[error] Paste your real API keys into config.py first."
+            print(f"\n  {c_red(error_msg)}\n")
             sys.exit(1)
     step("Credentials loaded")
 

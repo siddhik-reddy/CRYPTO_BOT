@@ -101,8 +101,9 @@ ABOUT = f"""
   ╔══════════════════════════════════════════════╗
   ║                   About                     ║
   ╠══════════════════════════════════════════════╣
-  ║  Binance Futures Testnet Trading Bot        ║
-  ║  Built for Primetrade.ai internship task    ║
+  ║ 
+  ║   Binance Futures Testnet Trading Bot      ║
+  ║    
   ╠══════════════════════════════════════════════╣
   ║  Author  :  Siddhik Reddy                  ║
   ║  Email   :  siddhikreddy440@gmail.com       ║
